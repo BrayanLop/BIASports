@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"/c/Users/Brayan Lopera/Documents/Clase3/PruebaCopilot/BIASports\" && npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir=false --import-alias=\"@/*\" --yes 2>&1)",
+      "Bash(cd \"/c/Users/Brayan Lopera/Documents/Clase3/PruebaCopilot/BIASports\" && npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir=false --import-alias=\"@/*\" --yes --name=\"biasports\" 2>&1)",
+      "Bash(mkdir -p \"/c/Users/Brayan Lopera/Documents/Clase3/PruebaCopilot/BIASports/temp_scaffold\" && cd \"/c/Users/Brayan Lopera/Documents/Clase3/PruebaCopilot/BIASports/temp_scaffold\" && npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir=false --import-alias=\"@/*\" --yes 2>&1)",
+      "Bash(cd \"/c/Users/Brayan Lopera/Documents/Clase3/PruebaCopilot/BIASports\" && npm install prisma @prisma/client next-auth@beta bcryptjs zustand recharts date-fns axios 2>&1)",
+      "Bash(cd \"/c/Users/Brayan Lopera/Documents/Clase3/PruebaCopilot/BIASports\" && npm install -D @types/bcryptjs 2>&1)",
+      "Bash(cd \"/c/Users/Brayan Lopera/Documents/Clase3/PruebaCopilot/BIASports\" && npx prisma init --datasource-provider postgresql 2>&1)"
+    ]
+  }
+}
