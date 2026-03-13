@@ -3,6 +3,20 @@ import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { updateUserStats } from "@/lib/stats";
 import { fetchMatchById } from "@/lib/sports-api";
+import { Prisma } from "@prisma/client";
+
+type MatchSnapshot = {
+  externalId?: string | null;
+  homeTeam?: string | null;
+  awayTeam?: string | null;
+  homeScore?: number | null;
+  awayScore?: number | null;
+  leagueName?: string | null;
+  leagueLogo?: string | null;
+  country?: string | null;
+  matchDate?: string | null;
+  status?: string | null;
+};
 
 async function getOrCreateSportByIdOrSlug(sportIdOrSlug: string) {
   const byId = await prisma.sport.findUnique({ where: { id: sportIdOrSlug } });
@@ -55,6 +69,7 @@ async function getOrCreateLeague(params: {
 async function getOrCreateMatchByExternalId(params: {
   externalId: string;
   sportId: string;
+  snapshot?: MatchSnapshot | null;
 }) {
   const existing = await prisma.match.findUnique({
     where: { externalId: params.externalId },
@@ -62,14 +77,32 @@ async function getOrCreateMatchByExternalId(params: {
   });
   if (existing) return existing;
 
-  const normalized = await fetchMatchById(params.externalId);
+  let normalized = await fetchMatchById(params.externalId);
+  if (!normalized && params.snapshot?.matchDate) {
+    const s = params.snapshot;
+    normalized = {
+      id: s.externalId || params.externalId,
+      externalId: s.externalId || params.externalId,
+      homeTeam: s.homeTeam || "TBD",
+      awayTeam: s.awayTeam || "TBD",
+      homeTeamLogo: "",
+      awayTeamLogo: "",
+      homeScore: typeof s.homeScore === "number" ? s.homeScore : null,
+      awayScore: typeof s.awayScore === "number" ? s.awayScore : null,
+      leagueName: s.leagueName || "",
+      leagueLogo: s.leagueLogo || "",
+      country: s.country || "",
+      matchDate: s.matchDate ?? new Date().toISOString(),
+      status: s.status || "SCHEDULED",
+    };
+  }
   if (!normalized) {
     throw new Error(`Match not found for externalId=${params.externalId}`);
   }
 
   const league = await getOrCreateLeague({
     sportId: params.sportId,
-    name: normalized.leagueName,
+    name: normalized.leagueName || "Unknown League",
     country: normalized.country,
     logo: normalized.leagueLogo,
   });
@@ -97,7 +130,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const { matchId, sportId, market, odds, stake, comment, isPublic } =
+    const { matchId, match: matchSnapshot, sportId, market, odds, stake, comment, isPublic } =
       await req.json();
 
     if (!matchId || !sportId || !market || !odds || !stake) {
@@ -114,15 +147,16 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const match = await getOrCreateMatchByExternalId({
+    const dbMatch = await getOrCreateMatchByExternalId({
       externalId: String(matchId),
       sportId: sport.id,
+      snapshot: matchSnapshot ?? null,
     });
 
     const pick = await prisma.pick.create({
       data: {
         userId: session.user.id,
-        matchId: match.id,
+        matchId: dbMatch.id,
         sportId: sport.id,
         market,
         odds: parseFloat(odds),
@@ -148,6 +182,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ data: pick }, { status: 201 });
   } catch (error) {
     console.error("Create pick error:", error);
+
+    if (error instanceof Error) {
+      if (error.message.includes("Match not found")) {
+        return NextResponse.json(
+          { error: "No se pudo encontrar el partido. Vuelve a buscarlo y selecciónalo otra vez." },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      // Unique constraint violations, etc.
+      if (error.code === "P2002") {
+        return NextResponse.json(
+          { error: "Ya existe un registro con esos datos. Intenta de nuevo." },
+          { status: 409 }
+        );
+      }
+    }
+
     return NextResponse.json({ error: "Error al crear la predicción" }, { status: 500 });
   }
 }

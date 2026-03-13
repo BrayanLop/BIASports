@@ -19,6 +19,7 @@ Optional: real matches
 
 - If `SPORTS_API_KEY` is set, `GET /api/matches` will use api-sports.io.
 - If `SPORTS_API_KEY` is empty, `GET /api/matches` will use TheSportsDB (free) schedule endpoints.
+- `APP_TIMEZONE` controls what “today” means for day-based fetching on the server (important on Railway, which typically runs in UTC). Example: `America/Bogota`.
 
 First, run the development server:
 

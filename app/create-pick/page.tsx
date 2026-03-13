@@ -37,17 +37,28 @@ export default function CreatePickPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    fetch("/api/matches?days=14", { signal: controller.signal })
-      .then((r) => r.json())
-      .then((data) => setMatches(data.data || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    const q = search.trim();
+
+    // Debounce typing so we don't spam the API.
+    const t = setTimeout(() => {
+      setLoading(true);
+
+      const url = q.length >= 2
+        ? `/api/matches?q=${encodeURIComponent(q)}&days=60`
+        : "/api/matches?days=14";
+
+      fetch(url, { signal: controller.signal })
+        .then((r) => r.json())
+        .then((data) => setMatches(data.data || []))
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }, 300);
 
     return () => {
+      clearTimeout(t);
       controller.abort();
     };
-  }, []);
+  }, [search]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,6 +77,20 @@ export default function CreatePickPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           matchId: selectedMatch.id,
+          // Provide a match snapshot so the API can persist it even if the external
+          // provider is rate-limited or temporarily unavailable at POST time.
+          match: {
+            externalId: selectedMatch.externalId,
+            homeTeam: selectedMatch.homeTeam,
+            awayTeam: selectedMatch.awayTeam,
+            homeScore: selectedMatch.homeScore,
+            awayScore: selectedMatch.awayScore,
+            leagueName: selectedMatch.leagueName,
+            leagueLogo: selectedMatch.leagueLogo,
+            country: selectedMatch.country,
+            matchDate: selectedMatch.matchDate,
+            status: selectedMatch.status,
+          },
           sportId: "football",
           market,
           odds: parseFloat(odds),
@@ -100,6 +125,7 @@ export default function CreatePickPage() {
   const q = search.trim().toLowerCase();
   const visibleMatches = matches
     .filter((m) => m.status === "SCHEDULED")
+    // When searching, the server already filtered, but keep a client-side guard.
     .filter((m) => {
       if (!isSearching) return true;
       const haystack = `${m.homeTeam} ${m.awayTeam} ${m.leagueName} ${m.country}`.toLowerCase();
