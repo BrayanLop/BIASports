@@ -3,14 +3,35 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const oauthError = searchParams.get("error");
+  const oauthErrorMessage = (() => {
+    if (!oauthError) return "";
+
+    switch (oauthError) {
+      case "OAuthAccountNotLinked":
+        return "Ese email ya está registrado con otro método. Inicia sesión con el método original (por ejemplo, email/contraseña) o usa el mismo proveedor con el que te registraste.";
+      case "Configuration":
+        return "Configuración inválida de autenticación. Revisa variables de entorno (AUTH_URL/AUTH_SECRET/GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET) y vuelve a intentar.";
+      case "OAuthCallback":
+      case "OAuthSignin":
+      case "Callback":
+        return "Falló el inicio de sesión con el proveedor. Revisa la URL del sitio (AUTH_URL) y la base de datos (DATABASE_URL) y vuelve a intentar.";
+      case "AccessDenied":
+        return "Acceso denegado. Revisa permisos e intenta de nuevo.";
+      default:
+        return "No se pudo iniciar sesión. Intenta de nuevo.";
+    }
+  })();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,9 +100,12 @@ export default function LoginPage() {
 
           {/* Email form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
+            {(oauthErrorMessage || error) && (
               <div className="rounded-lg bg-red-500/10 px-4 py-2 text-sm text-red-400">
-                {error}
+                {oauthErrorMessage || error}
+                {oauthError && process.env.NODE_ENV !== "production" && (
+                  <div className="mt-1 text-xs text-red-300/80">Código: {oauthError}</div>
+                )}
               </div>
             )}
             <div>

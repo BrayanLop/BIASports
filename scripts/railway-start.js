@@ -16,4 +16,4 @@ const port = process.env.PORT || "3000";
 run("npx", ["prisma", "migrate", "deploy"]);
 
 // Start Next.js on the platform-provided port
-run("npx", ["next", "start", "-p", port]);
+run("npx", ["next", "start", "-H", "0.0.0.0", "-p", port]);

@@ -54,6 +54,7 @@ High-level checklist:
 	- `NEXTAUTH_URL` and `AUTH_URL` (e.g. `https://your-app.up.railway.app` or your custom domain)
 	- `AUTH_TRUST_HOST=true`
 	- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (if using Google)
+	- Optional: `ALLOW_DANGEROUS_EMAIL_ACCOUNT_LINKING=false` to disable auto-linking OAuth by email
 4) Google OAuth Console:
 	- Authorized JavaScript origin: `https://your-domain`
 	- Authorized redirect URI: `https://your-domain/api/auth/callback/google`

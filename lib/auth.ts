@@ -13,9 +13,11 @@ const facebookClientId = process.env.FACEBOOK_CLIENT_ID;
 const facebookClientSecret = process.env.FACEBOOK_CLIENT_SECRET;
 
 const allowDangerousEmailAccountLinking =
-  process.env.ALLOW_DANGEROUS_EMAIL_ACCOUNT_LINKING === "true";
+  process.env.ALLOW_DANGEROUS_EMAIL_ACCOUNT_LINKING !== "false";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost:
+    process.env.AUTH_TRUST_HOST === "true" || process.env.NODE_ENV !== "production",
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
