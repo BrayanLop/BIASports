@@ -27,6 +27,7 @@ export default function CreatePickPage() {
   const [odds, setOdds] = useState("");
   const [stake, setStake] = useState("5");
   const [comment, setComment] = useState("");
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -35,11 +36,17 @@ export default function CreatePickPage() {
   }, [status, router]);
 
   useEffect(() => {
-    fetch("/api/matches")
+    const controller = new AbortController();
+    setLoading(true);
+    fetch("/api/matches?days=14", { signal: controller.signal })
       .then((r) => r.json())
       .then((data) => setMatches(data.data || []))
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    return () => {
+      controller.abort();
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -89,6 +96,16 @@ export default function CreatePickPage() {
 
   if (!session) return null;
 
+  const isSearching = search.trim().length >= 2;
+  const q = search.trim().toLowerCase();
+  const visibleMatches = matches
+    .filter((m) => m.status === "SCHEDULED")
+    .filter((m) => {
+      if (!isSearching) return true;
+      const haystack = `${m.homeTeam} ${m.awayTeam} ${m.leagueName} ${m.country}`.toLowerCase();
+      return haystack.includes(q);
+    });
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="mb-6 text-2xl font-bold text-white">Crear Predicción</h1>
@@ -105,42 +122,57 @@ export default function CreatePickPage() {
           <label className="mb-2 block text-sm font-medium text-zinc-400">
             Selecciona un partido
           </label>
-          {loading ? (
-            <div className="flex items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 py-8">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-700 border-t-green-500" />
-            </div>
-          ) : (
-            <div className="max-h-64 space-y-2 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900 p-3">
-              {matches.length === 0 ? (
-                <p className="text-center text-sm text-zinc-500">No hay partidos disponibles</p>
+          <div className="space-y-2 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por equipo, liga o país"
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-green-500 focus:outline-none"
+            />
+
+            <div className="max-h-56 space-y-2 overflow-y-auto">
+              {loading ? (
+                <div className="flex items-center justify-center py-6">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-700 border-t-green-500" />
+                </div>
+              ) : visibleMatches.length === 0 ? (
+                <p className="text-center text-sm text-zinc-500">
+                  {isSearching
+                    ? "No hay resultados para tu búsqueda"
+                    : "No hay partidos disponibles"}
+                </p>
               ) : (
-                matches
-                  .filter((m) => m.status === "SCHEDULED")
-                  .map((match) => (
-                    <button
-                      key={match.id}
-                      type="button"
-                      onClick={() => setSelectedMatch(match)}
-                      className={`w-full rounded-lg p-3 text-left transition ${
-                        selectedMatch?.id === match.id
-                          ? "border border-green-500 bg-green-500/10"
-                          : "border border-zinc-800 hover:border-zinc-600"
-                      }`}
-                    >
-                      <div className="text-xs text-zinc-500">{match.leagueName} · {match.country}</div>
-                      <div className="mt-1 text-sm font-medium text-white">
-                        {match.homeTeam} vs {match.awayTeam}
-                      </div>
-                      <div className="mt-1 text-xs text-zinc-500">
-                        {new Date(match.matchDate).toLocaleDateString("es-ES", {
-                          weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
-                        })}
-                      </div>
-                    </button>
-                  ))
+                visibleMatches.map((match) => (
+                  <button
+                    key={match.id}
+                    type="button"
+                    onClick={() => setSelectedMatch(match)}
+                    className={`w-full rounded-lg p-3 text-left transition ${
+                      selectedMatch?.id === match.id
+                        ? "border border-green-500 bg-green-500/10"
+                        : "border border-zinc-800 hover:border-zinc-600"
+                    }`}
+                  >
+                    <div className="text-xs text-zinc-500">
+                      {match.leagueName} · {match.country}
+                    </div>
+                    <div className="mt-1 text-sm font-medium text-white">
+                      {match.homeTeam} vs {match.awayTeam}
+                    </div>
+                    <div className="mt-1 text-xs text-zinc-500">
+                      {new Date(match.matchDate).toLocaleDateString("es-ES", {
+                        weekday: "short",
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </div>
+                  </button>
+                ))
               )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Market */}

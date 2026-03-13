@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { demoRanking } from "@/lib/demo-data";
 
 export async function GET(req: NextRequest) {
   try {
@@ -50,14 +49,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data: ranking });
   } catch (error) {
     console.error("Ranking error:", error);
-    // Return demo data when DB is unavailable
-    const { searchParams } = new URL(req.url);
-    const metric = searchParams.get("metric") || "roi";
-    const sorted = [...demoRanking].sort((a, b) => {
-      if (metric === "winrate") return b.stats.winRate - a.stats.winRate;
-      if (metric === "profit") return b.stats.totalProfit - a.stats.totalProfit;
-      return b.stats.roi - a.stats.roi;
-    }).map((item, i) => ({ ...item, rank: i + 1 }));
-    return NextResponse.json({ data: sorted });
+    return NextResponse.json({ data: [] });
   }
 }

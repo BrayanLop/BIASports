@@ -76,18 +76,10 @@ const demoMatches = [
     matchDate: new Date(ago(1)), status: "FINISHED", externalId: "dm5",
     league: { id: "l5", name: "Ligue 1", sportId: "s1", country: "Francia", logo: null },
   },
-  {
-    id: "demo-m6", homeTeam: "Lakers", awayTeam: "Celtics",
-    homeScore: 112, awayScore: 108, leagueId: "l6", sportId: "s2",
-    matchDate: new Date(ago(3)), status: "FINISHED", externalId: "dm6",
-    league: { id: "l6", name: "NBA", sportId: "s2", country: "USA", logo: null },
-  },
 ];
 
 const demoSports = [
   { id: "s1", name: "Fútbol", slug: "football", icon: "⚽" },
-  { id: "s2", name: "Basketball", slug: "basketball", icon: "🏀" },
-  { id: "s3", name: "Tenis", slug: "tennis", icon: "🎾" },
 ];
 
 export const demoFeedItems: FeedItem[] = [
@@ -130,14 +122,6 @@ export const demoFeedItems: FeedItem[] = [
     isPublic: true, createdAt: new Date(ago(0.3)), updatedAt: new Date(),
     user: demoUsers[4], match: demoMatches[3], sport: demoSports[0],
     _count: { comments: 3, likes: 22 }, isLiked: false, isFollowing: false,
-  },
-  {
-    id: "pick-6", userId: "demo-3", matchId: "demo-m6", sportId: "s2",
-    market: "Over 220.5", odds: 1.92, stake: 6, result: "WON",
-    comment: "Lakers vs Celtics siempre puntúan mucho. Ambos equipos en buena racha ofensiva. Easy over. 🏀",
-    isPublic: true, createdAt: new Date(ago(3)), updatedAt: new Date(),
-    user: demoUsers[2], match: demoMatches[5], sport: demoSports[1],
-    _count: { comments: 9, likes: 41 }, isLiked: false, isFollowing: false,
   },
   {
     id: "pick-7", userId: "demo-1", matchId: "demo-m2", sportId: "s1",

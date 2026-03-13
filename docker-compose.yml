@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16
+    container_name: biasports-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: biasports
+      POSTGRES_PASSWORD: biasports
+      POSTGRES_DB: biasports
+    ports:
+      - "5433:5432"
+    volumes:
+      - biasports_pgdata:/var/lib/postgresql/data
+
+volumes:
+  biasports_pgdata:

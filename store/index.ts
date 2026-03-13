@@ -65,7 +65,7 @@ export const useFeedStore = create<FeedState>()(
       hasMore: true,
       cursor: undefined,
       filter: "all",
-      sportFilter: "all",
+      sportFilter: "football",
       setItems: (items) => set({ items }),
       appendItems: (items) =>
         set((state) => ({ items: [...state.items, ...items] })),

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { demoFeedItems } from "@/lib/demo-data";
 
 export async function GET(req: NextRequest) {
   try {
@@ -94,13 +93,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("Feed error:", error);
-    // Return demo data when DB is unavailable
-    let items = demoFeedItems;
-    const { searchParams } = new URL(req.url);
-    const sport = searchParams.get("sport") || "all";
-    if (sport !== "all") {
-      items = items.filter((i) => i.sport.slug === sport);
-    }
-    return NextResponse.json({ data: items, hasMore: false });
+    return NextResponse.json({ data: [], hasMore: false });
   }
 }

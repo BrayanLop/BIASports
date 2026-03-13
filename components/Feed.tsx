@@ -12,10 +12,7 @@ const filters: { key: FeedFilterType; label: string }[] = [
 ];
 
 const sports: { key: SportFilterType; label: string; icon: string }[] = [
-  { key: "all", label: "Todos", icon: "🏆" },
   { key: "football", label: "Fútbol", icon: "⚽" },
-  { key: "basketball", label: "Basketball", icon: "🏀" },
-  { key: "tennis", label: "Tenis", icon: "🎾" },
 ];
 
 export default function Feed() {

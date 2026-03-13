@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { getDemoProfile } from "@/lib/demo-data";
 
 export async function GET(
   req: NextRequest,
@@ -44,9 +43,6 @@ export async function GET(
     return NextResponse.json({ data: { ...user, isFollowing } });
   } catch (error) {
     console.error("Get user error:", error);
-    const { username } = await params;
-    const profile = getDemoProfile(username);
-    if (profile) return NextResponse.json({ data: profile });
-    return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
+    return NextResponse.json({ error: "Error al cargar usuario" }, { status: 500 });
   }
 }

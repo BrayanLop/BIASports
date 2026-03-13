@@ -125,7 +125,7 @@ export interface RankingUser {
 }
 
 export type FeedFilterType = "all" | "following" | "trending";
-export type SportFilterType = "all" | "football" | "basketball" | "tennis" | "baseball";
+export type SportFilterType = "football";
 export type RankingMetric = "roi" | "winrate" | "profit";
 
 export interface PaginationParams {

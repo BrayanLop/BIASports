@@ -2,6 +2,24 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+### Environment variables
+
+This project requires a Postgres connection string for Prisma.
+
+1) Create a `.env` file in the project root (you can start from `.env.example`).
+2) Set at least `DATABASE_URL`.
+
+Then generate Prisma Client:
+
+```bash
+npx prisma generate
+```
+
+Optional: real matches
+
+- If `SPORTS_API_KEY` is set, `GET /api/matches` will use api-sports.io.
+- If `SPORTS_API_KEY` is empty, `GET /api/matches` returns mock matches.
+
 First, run the development server:
 
 ```bash
@@ -15,6 +33,14 @@ bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+### Prisma Studio (view your DB)
+
+After setting `DATABASE_URL`:
+
+```bash
+npx prisma studio
+```
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

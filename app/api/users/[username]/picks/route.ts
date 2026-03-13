@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { getDemoUserPicks } from "@/lib/demo-data";
 
 export async function GET(
   req: NextRequest,
@@ -69,8 +68,6 @@ export async function GET(
     });
   } catch (error) {
     console.error("User picks error:", error);
-    const { username } = await params;
-    const picks = getDemoUserPicks(username);
-    return NextResponse.json({ data: picks, hasMore: false });
+    return NextResponse.json({ data: [], hasMore: false });
   }
 }

@@ -6,40 +6,65 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+const facebookClientId = process.env.FACEBOOK_CLIENT_ID;
+const facebookClientSecret = process.env.FACEBOOK_CLIENT_SECRET;
+
+const allowDangerousEmailAccountLinking =
+  process.env.ALLOW_DANGEROUS_EMAIL_ACCOUNT_LINKING === "true";
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
   },
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID ?? "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-      profile(profile) {
-        return {
-          id: profile.sub,
-          name: profile.name,
-          email: profile.email,
-          image: profile.picture,
-          username: profile.email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "_"),
-        };
-      },
-    }),
-    FacebookProvider({
-      clientId: process.env.FACEBOOK_CLIENT_ID ?? "",
-      clientSecret: process.env.FACEBOOK_CLIENT_SECRET ?? "",
-      profile(profile) {
-        return {
-          id: profile.id,
-          name: profile.name,
-          email: profile.email,
-          image: profile.picture?.data?.url,
-          username: profile.email
-            ? profile.email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "_")
-            : `user_${profile.id}`,
-        };
-      },
-    }),
+    ...(googleClientId && googleClientSecret
+      ? [
+          GoogleProvider({
+            clientId: googleClientId,
+            clientSecret: googleClientSecret,
+            allowDangerousEmailAccountLinking,
+            profile(profile) {
+              return {
+                id: profile.sub,
+                name: profile.name,
+                email: profile.email,
+                image: profile.picture,
+                username: profile.email
+                  .split("@")[0]
+                  .toLowerCase()
+                  .replace(/[^a-z0-9_]/g, "_"),
+              };
+            },
+          }),
+        ]
+      : []),
+    ...(facebookClientId && facebookClientSecret
+      ? [
+          FacebookProvider({
+            clientId: facebookClientId,
+            clientSecret: facebookClientSecret,
+            allowDangerousEmailAccountLinking,
+            profile(profile) {
+              return {
+                id: profile.id,
+                name: profile.name,
+                email: profile.email,
+                image: profile.picture?.data?.url,
+                username: profile.email
+                  ? profile.email
+                      .split("@")[0]
+                      .toLowerCase()
+                      .replace(/[^a-z0-9_]/g, "_")
+                  : `user_${profile.id}`,
+              };
+            },
+          }),
+        ]
+      : []),
     CredentialsProvider({
       name: "credentials",
       credentials: {

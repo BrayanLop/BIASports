@@ -3,6 +3,10 @@ import axios from "axios";
 const API_BASE_URL = "https://v3.football.api-sports.io";
 const API_KEY = process.env.SPORTS_API_KEY ?? "";
 
+const THESPORTSDB_BASE_URL = "https://www.thesportsdb.com/api/v1/json";
+// TheSportsDB documents a public test key "123"; for reliability, set your own.
+const THESPORTSDB_KEY = process.env.THESPORTSDB_KEY ?? "123";
+
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -73,6 +77,240 @@ export interface NormalizedMatch {
   externalId: string;
 }
 
+interface TheSportsDbEvent {
+  idEvent: string;
+  strEvent?: string | null;
+  strSport?: string | null;
+  strLeague?: string | null;
+  strCountry?: string | null;
+  idHomeTeam?: string | null;
+  idAwayTeam?: string | null;
+  strHomeTeam?: string | null;
+  strAwayTeam?: string | null;
+  intHomeScore?: string | null;
+  intAwayScore?: string | null;
+  dateEvent?: string | null; // YYYY-MM-DD
+  strTime?: string | null; // HH:mm:ss
+  strTimestamp?: string | null;
+  strStatus?: string | null;
+}
+
+function normalizeTheSportsDbStatus(eventIso: string | null, homeScore: number | null, awayScore: number | null) {
+  if (homeScore !== null || awayScore !== null) return "FINISHED";
+  if (!eventIso) return "SCHEDULED";
+  const t = new Date(eventIso).getTime();
+  if (Number.isNaN(t)) return "SCHEDULED";
+  return t > Date.now() ? "SCHEDULED" : "SCHEDULED";
+}
+
+function normalizeTheSportsDbMatch(e: TheSportsDbEvent): NormalizedMatch {
+  const date = e.strTimestamp
+    ? new Date(e.strTimestamp).toISOString()
+    : e.dateEvent
+      ? new Date(`${e.dateEvent}T${e.strTime || "00:00:00"}Z`).toISOString()
+      : new Date().toISOString();
+
+  const homeScore = e.intHomeScore != null && e.intHomeScore !== "" ? Number(e.intHomeScore) : null;
+  const awayScore = e.intAwayScore != null && e.intAwayScore !== "" ? Number(e.intAwayScore) : null;
+
+  return {
+    id: e.idEvent,
+    homeTeam: e.strHomeTeam || "TBD",
+    awayTeam: e.strAwayTeam || "TBD",
+    homeTeamLogo: "",
+    awayTeamLogo: "",
+    homeScore: Number.isFinite(homeScore) ? homeScore : null,
+    awayScore: Number.isFinite(awayScore) ? awayScore : null,
+    leagueName: e.strLeague || "",
+    leagueLogo: "",
+    country: e.strCountry || "",
+    matchDate: date,
+    status: normalizeTheSportsDbStatus(date, Number.isFinite(homeScore) ? homeScore : null, Number.isFinite(awayScore) ? awayScore : null),
+    externalId: e.idEvent,
+  };
+}
+
+interface TheSportsDbTeam {
+  idTeam: string;
+  strTeam?: string | null;
+  strSport?: string | null;
+  strTeamShort?: string | null;
+  strAlternate?: string | null;
+}
+
+function normalizeLooseText(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[_\-]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function pickBestTheSportsDbTeam(teams: TheSportsDbTeam[], query: string): TheSportsDbTeam | null {
+  if (teams.length === 0) return null;
+  const q = normalizeLooseText(query);
+
+  const scored = teams
+    .map((team) => {
+      const name = normalizeLooseText(team.strTeam || "");
+      const shortName = normalizeLooseText(team.strTeamShort || "");
+      const alt = normalizeLooseText(team.strAlternate || "");
+
+      let score = 0;
+      if (name === q || shortName === q) score += 100;
+      if (name.startsWith(q) || shortName.startsWith(q)) score += 60;
+      if (name.includes(q) || shortName.includes(q)) score += 25;
+      if (alt.includes(q)) score += 10;
+
+      // Prefer soccer only
+      if ((team.strSport || "").toLowerCase() === "soccer") score += 5;
+
+      return { team, score };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  return scored[0]?.team ?? null;
+}
+
+function scoreTheSportsDbTeams(teams: TheSportsDbTeam[], query: string): Array<{ team: TheSportsDbTeam; score: number }> {
+  const q = normalizeLooseText(query);
+  return teams
+    .map((team) => {
+      const name = normalizeLooseText(team.strTeam || "");
+      const shortName = normalizeLooseText(team.strTeamShort || "");
+      const alt = normalizeLooseText(team.strAlternate || "");
+
+      let score = 0;
+      if (name === q || shortName === q) score += 100;
+      if (name.startsWith(q) || shortName.startsWith(q)) score += 60;
+      if (name.includes(q) || shortName.includes(q)) score += 25;
+      if (alt.includes(q)) score += 10;
+
+      if ((team.strSport || "").toLowerCase() === "soccer") score += 5;
+      return { team, score };
+    })
+    .sort((a, b) => b.score - a.score);
+}
+
+async function searchTheSportsDbTeams(query: string): Promise<TheSportsDbTeam[]> {
+  const q = query.trim();
+  if (!q) return [];
+
+  const url = `${THESPORTSDB_BASE_URL}/${THESPORTSDB_KEY}/searchteams.php`;
+  try {
+    const res = await axios.get(url, { params: { t: q } });
+    const teams: TheSportsDbTeam[] = res.data?.teams || [];
+    return teams.filter((t) => (t.strSport || "").toLowerCase() === "soccer");
+  } catch (error) {
+    console.error("Error searching TheSportsDB teams:", error);
+    return [];
+  }
+}
+
+async function fetchTheSportsDbNextEventsByTeamId(teamId: string): Promise<TheSportsDbEvent[]> {
+  const url = `${THESPORTSDB_BASE_URL}/${THESPORTSDB_KEY}/eventsnext.php`;
+  try {
+    const res = await axios.get(url, { params: { id: teamId } });
+    const events: TheSportsDbEvent[] = res.data?.events || [];
+    return events;
+  } catch (error) {
+    console.error("Error fetching TheSportsDB next team events:", error);
+    return [];
+  }
+}
+
+export async function searchUpcomingFootballMatches(query: string, daysAhead: number = 30): Promise<NormalizedMatch[]> {
+  const q = query.trim();
+  if (!q) return [];
+
+  const days = Math.max(1, Math.min(60, Math.floor(daysAhead)));
+  const now = Date.now();
+  const max = now + days * 24 * 60 * 60 * 1000;
+
+  const teams = await searchTheSportsDbTeams(q);
+  if (teams.length === 0) return [];
+
+  // With the free key, `eventsnext` is limited, so we fetch from a few top candidates.
+  const scored = scoreTheSportsDbTeams(teams, q);
+  const candidates = scored
+    .filter((x) => x.score > 0)
+    .slice(0, 3)
+    .map((x) => x.team);
+
+  const fallbackBest = pickBestTheSportsDbTeam(teams, q);
+  const finalCandidates = candidates.length > 0 ? candidates : fallbackBest ? [fallbackBest] : [];
+  if (finalCandidates.length === 0) return [];
+
+  const eventsLists = await Promise.all(finalCandidates.map((t) => fetchTheSportsDbNextEventsByTeamId(t.idTeam)));
+  const matches = eventsLists
+    .flat()
+    .filter((e) => (e.strSport || "").toLowerCase() === "soccer")
+    .filter((e) => Boolean(e.strTimestamp || e.dateEvent))
+    .map(normalizeTheSportsDbMatch)
+    .filter((m) => {
+      const t = new Date(m.matchDate).getTime();
+      if (Number.isNaN(t)) return false;
+      return t >= now && t <= max;
+    })
+    .sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
+
+  // Deduplicate by externalId/id
+  const seen = new Set<string>();
+  return matches.filter((m) => {
+    const key = m.externalId || m.id;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export async function searchFootballEvents(query: string): Promise<NormalizedMatch[]> {
+  const q = query.trim();
+  if (!q) return [];
+
+  const url = `${THESPORTSDB_BASE_URL}/${THESPORTSDB_KEY}/searchevents.php`;
+  try {
+    const res = await axios.get(url, { params: { e: q } });
+    const events: TheSportsDbEvent[] = res.data?.event || [];
+    return events
+      .filter((e) => (e.strSport || "").toLowerCase() === "soccer")
+      .map(normalizeTheSportsDbMatch)
+      .sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
+  } catch (error) {
+    console.error("Error searching TheSportsDB events:", error);
+    return [];
+  }
+}
+
+async function lookupTheSportsDbEventById(eventId: string): Promise<NormalizedMatch | null> {
+  const url = `${THESPORTSDB_BASE_URL}/${THESPORTSDB_KEY}/lookupevent.php`;
+  try {
+    const res = await axios.get(url, { params: { id: eventId } });
+    const events: TheSportsDbEvent[] = res.data?.events || [];
+    const e = events[0];
+    if (!e) return null;
+    if ((e.strSport || "").toLowerCase() !== "soccer") return null;
+    return normalizeTheSportsDbMatch(e);
+  } catch (error) {
+    console.error("Error looking up TheSportsDB event:", error);
+    return null;
+  }
+}
+
+async function fetchTheSportsDbEventsByDay(date: string): Promise<TheSportsDbEvent[]> {
+  const url = `${THESPORTSDB_BASE_URL}/${THESPORTSDB_KEY}/eventsday.php`;
+  try {
+    const res = await axios.get(url, { params: { d: date, s: "Soccer" } });
+    const events: TheSportsDbEvent[] = res.data?.events || [];
+    return events;
+  } catch (error) {
+    console.error("Error fetching TheSportsDB events by day:", error);
+    return [];
+  }
+}
+
 function normalizeStatus(status: string): string {
   const statusMap: Record<string, string> = {
     NS: "SCHEDULED",
@@ -118,7 +356,12 @@ function normalizeMatch(apiMatch: ApiMatch): NormalizedMatch {
 
 export async function fetchTodayMatches(): Promise<NormalizedMatch[]> {
   if (!API_KEY) {
-    return getMockMatches();
+    const today = new Date().toISOString().split("T")[0];
+    const events = await fetchTheSportsDbEventsByDay(today);
+    return events
+      .filter((e) => (e.strSport || "").toLowerCase() === "soccer")
+      .map(normalizeTheSportsDbMatch)
+      .sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
   }
 
   try {
@@ -133,14 +376,65 @@ export async function fetchTodayMatches(): Promise<NormalizedMatch[]> {
     return [];
   } catch (error) {
     console.error("Error fetching today matches:", error);
-    return getMockMatches();
+    return [];
   }
+}
+
+async function fetchMatchesByDate(date: string): Promise<NormalizedMatch[]> {
+  if (!API_KEY) {
+    const events = await fetchTheSportsDbEventsByDay(date);
+    return events
+      .filter((e) => (e.strSport || "").toLowerCase() === "soccer")
+      .map(normalizeTheSportsDbMatch)
+      .sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
+  }
+
+  try {
+    const response = await apiClient.get("/fixtures", {
+      params: { date },
+    });
+
+    if (response.data?.response) {
+      return response.data.response.map(normalizeMatch);
+    }
+    return [];
+  } catch (error) {
+    console.error("Error fetching matches by date:", error);
+    return [];
+  }
+}
+
+export async function fetchUpcomingMatches(daysAhead: number = 7): Promise<NormalizedMatch[]> {
+  const days = Math.max(1, Math.min(14, Math.floor(daysAhead)));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const all: NormalizedMatch[] = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + i);
+    const date = d.toISOString().split("T")[0];
+    const matches = await fetchMatchesByDate(date);
+    all.push(...matches);
+  }
+
+  // Deduplicate by externalId/id
+  const seen = new Set<string>();
+  const unique = all.filter((m) => {
+    const key = m.externalId || m.id;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  // Keep chronological order
+  unique.sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
+  return unique;
 }
 
 export async function fetchMatchById(matchId: string): Promise<NormalizedMatch | null> {
   if (!API_KEY) {
-    const mocks = getMockMatches();
-    return mocks.find((m) => m.externalId === matchId) ?? null;
+    return lookupTheSportsDbEventById(matchId);
   }
 
   try {
@@ -160,7 +454,8 @@ export async function fetchMatchById(matchId: string): Promise<NormalizedMatch |
 
 export async function fetchLiveMatches(): Promise<NormalizedMatch[]> {
   if (!API_KEY) {
-    return getMockMatches().filter((m) => m.status === "LIVE");
+    // TheSportsDB v1 free endpoints don't provide a reliable livescore feed.
+    return [];
   }
 
   try {
@@ -176,88 +471,4 @@ export async function fetchLiveMatches(): Promise<NormalizedMatch[]> {
     console.error("Error fetching live matches:", error);
     return [];
   }
-}
-
-function getMockMatches(): NormalizedMatch[] {
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  return [
-    {
-      id: "mock-1",
-      homeTeam: "Real Madrid",
-      awayTeam: "FC Barcelona",
-      homeTeamLogo: "https://media.api-sports.io/football/teams/541.png",
-      awayTeamLogo: "https://media.api-sports.io/football/teams/529.png",
-      homeScore: null,
-      awayScore: null,
-      leagueName: "La Liga",
-      leagueLogo: "https://media.api-sports.io/football/leagues/140.png",
-      country: "Spain",
-      matchDate: today.toISOString(),
-      status: "SCHEDULED",
-      externalId: "mock-1",
-    },
-    {
-      id: "mock-2",
-      homeTeam: "Manchester City",
-      awayTeam: "Arsenal",
-      homeTeamLogo: "https://media.api-sports.io/football/teams/50.png",
-      awayTeamLogo: "https://media.api-sports.io/football/teams/42.png",
-      homeScore: 2,
-      awayScore: 1,
-      leagueName: "Premier League",
-      leagueLogo: "https://media.api-sports.io/football/leagues/39.png",
-      country: "England",
-      matchDate: today.toISOString(),
-      status: "LIVE",
-      externalId: "mock-2",
-    },
-    {
-      id: "mock-3",
-      homeTeam: "PSG",
-      awayTeam: "Marseille",
-      homeTeamLogo: "https://media.api-sports.io/football/teams/85.png",
-      awayTeamLogo: "https://media.api-sports.io/football/teams/81.png",
-      homeScore: null,
-      awayScore: null,
-      leagueName: "Ligue 1",
-      leagueLogo: "https://media.api-sports.io/football/leagues/61.png",
-      country: "France",
-      matchDate: tomorrow.toISOString(),
-      status: "SCHEDULED",
-      externalId: "mock-3",
-    },
-    {
-      id: "mock-4",
-      homeTeam: "Bayern Munich",
-      awayTeam: "Borussia Dortmund",
-      homeTeamLogo: "https://media.api-sports.io/football/teams/157.png",
-      awayTeamLogo: "https://media.api-sports.io/football/teams/165.png",
-      homeScore: 3,
-      awayScore: 0,
-      leagueName: "Bundesliga",
-      leagueLogo: "https://media.api-sports.io/football/leagues/78.png",
-      country: "Germany",
-      matchDate: today.toISOString(),
-      status: "FINISHED",
-      externalId: "mock-4",
-    },
-    {
-      id: "mock-5",
-      homeTeam: "Juventus",
-      awayTeam: "AC Milan",
-      homeTeamLogo: "https://media.api-sports.io/football/teams/496.png",
-      awayTeamLogo: "https://media.api-sports.io/football/teams/489.png",
-      homeScore: null,
-      awayScore: null,
-      leagueName: "Serie A",
-      leagueLogo: "https://media.api-sports.io/football/leagues/135.png",
-      country: "Italy",
-      matchDate: today.toISOString(),
-      status: "SCHEDULED",
-      externalId: "mock-5",
-    },
-  ];
 }
