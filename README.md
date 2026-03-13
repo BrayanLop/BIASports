@@ -18,7 +18,7 @@ npx prisma generate
 Optional: real matches
 
 - If `SPORTS_API_KEY` is set, `GET /api/matches` will use api-sports.io.
-- If `SPORTS_API_KEY` is empty, `GET /api/matches` returns mock matches.
+- If `SPORTS_API_KEY` is empty, `GET /api/matches` will use TheSportsDB (free) schedule endpoints.
 
 First, run the development server:
 
@@ -41,6 +41,23 @@ After setting `DATABASE_URL`:
 ```bash
 npx prisma studio
 ```
+
+## Deploy to Railway (DB + SSO)
+
+High-level checklist:
+
+1) Create a Railway project from your GitHub repo.
+2) Add a PostgreSQL service.
+3) In your web service variables, set:
+	- `DATABASE_URL` (from the Railway Postgres plugin)
+	- `AUTH_SECRET`
+	- `NEXTAUTH_URL` and `AUTH_URL` (e.g. `https://your-app.up.railway.app` or your custom domain)
+	- `AUTH_TRUST_HOST=true`
+	- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (if using Google)
+4) Google OAuth Console:
+	- Authorized JavaScript origin: `https://your-domain`
+	- Authorized redirect URI: `https://your-domain/api/auth/callback/google`
+5) Prisma migrations run on start via `npm run start` (`prisma migrate deploy`).
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
