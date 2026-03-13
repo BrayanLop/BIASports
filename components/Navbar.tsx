@@ -14,7 +14,7 @@ export default function Navbar() {
     <nav className="sticky top-0 z-50 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2 text-xl font-bold text-white">
-          <span className="text-2xl">⚽</span>
+          <img src="/icon.svg" alt="BIA Sports" className="h-7 w-7" />
           <span className="bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
             BIA Sports
           </span>

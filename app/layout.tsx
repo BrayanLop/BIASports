@@ -17,6 +17,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "BIA Sports - Predicciones Deportivas",
   description: "Plataforma social de predicciones deportivas. Publica tus picks, compite y sigue a los mejores tipsters.",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+  },
 };
 
 export default function RootLayout({

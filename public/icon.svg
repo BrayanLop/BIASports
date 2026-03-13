@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="BIA Sports">
+  <defs>
+    <linearGradient id="g" x1="96" y1="96" x2="416" y2="416" gradientUnits="userSpaceOnUse">
+      <!-- Tailwind-like: green-400 -> emerald-500 -->
+      <stop offset="0" stop-color="#34D399"/>
+      <stop offset="1" stop-color="#10B981"/>
+    </linearGradient>
+    <radialGradient id="shine" cx="0.3" cy="0.25" r="0.9">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background badge -->
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#g)"/>
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#shine)"/>
+
+  <!-- Minimal football mark (generic, non-branded) -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" opacity="0.95">
+    <circle cx="256" cy="266" r="138"/>
+    <path d="M256 156l58 42-22 68h-72l-22-68 58-42z"/>
+    <path d="M198 198l-54 10"/>
+    <path d="M314 198l54 10"/>
+    <path d="M220 266l-36 54"/>
+    <path d="M292 266l36 54"/>
+    <path d="M256 344v60"/>
+  </g>
+
+  <!-- Small 'BIA' tag for identity -->
+  <g fill="#0B1220" opacity="0.9">
+    <rect x="148" y="86" width="216" height="64" rx="18"/>
+  </g>
+  <text x="256" y="132" text-anchor="middle" font-size="34" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial" fill="#FFFFFF" font-weight="800" letter-spacing="2">
+    BIA
+  </text>
+</svg>

@@ -1,16 +1,12 @@
 import NextAuth from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import GoogleProvider from "next-auth/providers/google";
-import FacebookProvider from "next-auth/providers/facebook";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-
-const facebookClientId = process.env.FACEBOOK_CLIENT_ID;
-const facebookClientSecret = process.env.FACEBOOK_CLIENT_SECRET;
 
 const allowDangerousEmailAccountLinking =
   process.env.ALLOW_DANGEROUS_EMAIL_ACCOUNT_LINKING !== "false";
@@ -39,29 +35,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                   .split("@")[0]
                   .toLowerCase()
                   .replace(/[^a-z0-9_]/g, "_"),
-              };
-            },
-          }),
-        ]
-      : []),
-    ...(facebookClientId && facebookClientSecret
-      ? [
-          FacebookProvider({
-            clientId: facebookClientId,
-            clientSecret: facebookClientSecret,
-            allowDangerousEmailAccountLinking,
-            profile(profile) {
-              return {
-                id: profile.id,
-                name: profile.name,
-                email: profile.email,
-                image: profile.picture?.data?.url,
-                username: profile.email
-                  ? profile.email
-                      .split("@")[0]
-                      .toLowerCase()
-                      .replace(/[^a-z0-9_]/g, "_")
-                  : `user_${profile.id}`,
               };
             },
           }),
@@ -106,20 +79,42 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger }) {
       if (user) {
         token.id = user.id;
         token.username = (user as { username?: string }).username;
+        token.name = user.name;
+        token.picture = user.image;
       }
 
       if (account?.provider !== "credentials" && token.email) {
         const dbUser = await prisma.user.findUnique({
           where: { email: token.email },
-          select: { id: true, username: true },
+          select: { id: true, username: true, name: true, image: true },
         });
         if (dbUser) {
           token.id = dbUser.id;
           token.username = dbUser.username;
+          token.name = dbUser.name;
+          token.picture = dbUser.image;
+        }
+      }
+
+      // Keep token profile fields in sync after edits (e.g. username change).
+      // Throttle the DB lookup to reduce load.
+      const now = Date.now();
+      const lastSync = typeof (token as any).profileSyncAt === "number" ? (token as any).profileSyncAt : 0;
+      const shouldSync = trigger === "update" || !lastSync || now - lastSync > 60_000;
+      if (shouldSync && token.id) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { username: true, name: true, image: true },
+        });
+        if (dbUser) {
+          token.username = dbUser.username;
+          token.name = dbUser.name;
+          token.picture = dbUser.image;
+          (token as any).profileSyncAt = now;
         }
       }
 
@@ -129,6 +124,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (token) {
         session.user.id = token.id as string;
         (session.user as { username?: string }).username = token.username as string;
+        if (typeof token.name === "string") session.user.name = token.name;
+        if (typeof token.picture === "string") session.user.image = token.picture;
       }
       return session;
     },
