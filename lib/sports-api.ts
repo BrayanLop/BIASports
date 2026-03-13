@@ -725,6 +725,48 @@ export async function fetchUpcomingMatches(daysAhead: number = 7): Promise<Norma
 }
 
 export async function fetchMatchById(matchId: string): Promise<NormalizedMatch | null> {
+  // DB-first cache: if the match is already persisted, avoid an external call unless it likely needs refresh.
+  // (We refresh only for past matches that are not finished or missing scores.)
+  try {
+    const mod = await import("./prisma");
+    const prisma = mod.default;
+    const cached = await prisma.match.findUnique({
+      where: { externalId: matchId },
+      include: { league: { select: { name: true, country: true, logo: true } } },
+    });
+
+    if (cached) {
+      const normalized: NormalizedMatch = {
+        id: cached.externalId || cached.id,
+        externalId: cached.externalId || cached.id,
+        homeTeam: cached.homeTeam,
+        awayTeam: cached.awayTeam,
+        homeTeamLogo: "",
+        awayTeamLogo: "",
+        homeScore: cached.homeScore,
+        awayScore: cached.awayScore,
+        leagueName: cached.league?.name || "",
+        leagueLogo: cached.league?.logo || "",
+        country: cached.league?.country || "",
+        matchDate: cached.matchDate.toISOString(),
+        status: cached.status,
+      };
+
+      const t = cached.matchDate.getTime();
+      const isPast = Number.isFinite(t) ? t <= Date.now() : false;
+      const needsRefresh =
+        isPast &&
+        (String(cached.status || "").toUpperCase() !== "FINISHED" ||
+          cached.homeScore === null ||
+          cached.awayScore === null);
+
+      if (!needsRefresh) return normalized;
+      // If it might have updated (live/finished), fall through to provider fetch.
+    }
+  } catch {
+    // Ignore DB cache errors and fall back to provider fetch.
+  }
+
   if (!API_KEY) {
     return lookupTheSportsDbEventById(matchId);
   }
