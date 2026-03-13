@@ -95,12 +95,27 @@ interface TheSportsDbEvent {
   strStatus?: string | null;
 }
 
-function normalizeTheSportsDbStatus(eventIso: string | null, homeScore: number | null, awayScore: number | null) {
-  if (homeScore !== null || awayScore !== null) return "FINISHED";
+function normalizeTheSportsDbStatus(
+  eventIso: string | null,
+  homeScore: number | null,
+  awayScore: number | null,
+  rawStatus?: string | null
+) {
+  const s = (rawStatus || "").toLowerCase();
+  if (s.includes("postpon") || s.includes("cancel")) return "POSTPONED";
+  if (s.includes("finished") || s.includes("ft")) return "FINISHED";
+
   if (!eventIso) return "SCHEDULED";
   const t = new Date(eventIso).getTime();
   if (Number.isNaN(t)) return "SCHEDULED";
-  return t > Date.now() ? "SCHEDULED" : "SCHEDULED";
+
+  // If the event is in the future, it's scheduled even if the API sends 0-0 placeholders.
+  if (t > Date.now()) return "SCHEDULED";
+
+  // TheSportsDB free endpoints don't reliably provide live states.
+  // If it's in the past and we have scores, consider it finished.
+  if (homeScore !== null && awayScore !== null) return "FINISHED";
+  return "SCHEDULED";
 }
 
 function normalizeTheSportsDbMatch(e: TheSportsDbEvent): NormalizedMatch {
@@ -110,8 +125,18 @@ function normalizeTheSportsDbMatch(e: TheSportsDbEvent): NormalizedMatch {
       ? new Date(`${e.dateEvent}T${e.strTime || "00:00:00"}Z`).toISOString()
       : new Date().toISOString();
 
-  const homeScore = e.intHomeScore != null && e.intHomeScore !== "" ? Number(e.intHomeScore) : null;
-  const awayScore = e.intAwayScore != null && e.intAwayScore !== "" ? Number(e.intAwayScore) : null;
+  const parsedHome = e.intHomeScore != null && e.intHomeScore !== "" ? Number(e.intHomeScore) : null;
+  const parsedAway = e.intAwayScore != null && e.intAwayScore !== "" ? Number(e.intAwayScore) : null;
+
+  const t = new Date(date).getTime();
+  const isFuture = Number.isFinite(t) ? t > Date.now() : false;
+
+  // Some TheSportsDB schedules provide 0-0 placeholders for not-started matches.
+  // Hide those until the match is actually played.
+  const homeScore =
+    isFuture && parsedHome === 0 && parsedAway === 0 ? null : parsedHome;
+  const awayScore =
+    isFuture && parsedHome === 0 && parsedAway === 0 ? null : parsedAway;
 
   return {
     id: e.idEvent,
@@ -125,7 +150,12 @@ function normalizeTheSportsDbMatch(e: TheSportsDbEvent): NormalizedMatch {
     leagueLogo: "",
     country: e.strCountry || "",
     matchDate: date,
-    status: normalizeTheSportsDbStatus(date, Number.isFinite(homeScore) ? homeScore : null, Number.isFinite(awayScore) ? awayScore : null),
+    status: normalizeTheSportsDbStatus(
+      date,
+      Number.isFinite(homeScore) ? homeScore : null,
+      Number.isFinite(awayScore) ? awayScore : null,
+      e.strStatus
+    ),
     externalId: e.idEvent,
   };
 }
