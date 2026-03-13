@@ -1,0 +1,29 @@
+name: Cron Sync (Matches & Picks)
+
+on:
+  schedule:
+    # Every 510 minutes
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call /api/cron/sync
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Missing secrets: APP_URL and/or CRON_SECRET" >&2
+            exit 1
+          fi
+
+          echo "Calling $APP_URL/api/cron/sync"
+          curl -sS -X POST \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            "$APP_URL/api/cron/sync" \
+            | tee /dev/stderr
